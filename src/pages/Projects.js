@@ -6,40 +6,67 @@ const Projects = () => {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Fetch ALL repos (pagination aware)
+  async function fetchAllRepos() {
+    let allRepos = [];
+    let page = 1;
+    let done = false;
+
+    while (!done) {
+      const res = await fetch(
+        `https://api.github.com/users/${GITHUB_USERNAME}/repos?per_page=100&page=${page}&sort=updated`
+      );
+      const data = await res.json();
+
+      if (data.length === 0) done = true;
+      else {
+        allRepos = allRepos.concat(data);
+        page++;
+      }
+    }
+
+    return allRepos;
+  }
+
   useEffect(() => {
     async function fetchRepos() {
       try {
-        const res = await fetch(
-          `https://api.github.com/users/${GITHUB_USERNAME}/repos?sort=updated&per_page=50`
-        );
-        const data = await res.json();
+        const repos = await fetchAllRepos();
 
-        // Group repos by base name (prefix before first "-")
-        const grouped = data.reduce((acc, repo) => {
-          // Skip archived or forked repos (optional)
-          if (repo.fork) return acc;
+        // Filter only your owned, non-fork repos
+        const userRepos = repos.filter((repo) => !repo.fork && repo.owner.login === GITHUB_USERNAME);
 
-          const baseName = repo.name.split("-")[0]; // e.g. obsidian-core → obsidian
-          if (!acc[baseName]) acc[baseName] = [];
-          acc[baseName].push(repo);
+        // Group by base project name
+        const grouped = userRepos.reduce((acc, repo) => {
+          const base = repo.name.split("-")[0]; // e.g. obsidian-core → obsidian
+          if (!acc[base]) acc[base] = [];
+          acc[base].push(repo);
           return acc;
         }, {});
 
-        // Convert to array format
-        const groupedProjects = Object.entries(grouped).map(([key, repos]) => ({
-          name: key.charAt(0).toUpperCase() + key.slice(1),
+        // Convert grouped repos to clean project objects
+        const groupedProjects = Object.entries(grouped).map(([name, repos]) => ({
+          name: name.charAt(0).toUpperCase() + name.slice(1),
           description:
             repos[0].description ||
-            "A project made up of multiple repositories.",
+            (repos.length > 1
+              ? "A multi-part project built across several repositories."
+              : "A project from my GitHub portfolio."),
           links: repos.map((r) => ({
             label:
               repos.length > 1
-                ? r.name.replace(`${key}-`, "").replaceAll("-", " ")
+                ? r.name.replace(`${name}-`, "").replaceAll("-", " ")
                 : "GitHub",
             url: r.html_url,
           })),
           tech: [],
+          updated_at: repos[0].updated_at,
         }));
+
+        // Sort newest first
+        groupedProjects.sort(
+          (a, b) => new Date(b.updated_at) - new Date(a.updated_at)
+        );
 
         setProjects(groupedProjects);
       } catch (err) {
@@ -57,7 +84,7 @@ const Projects = () => {
   return (
     <section className="section">
       <h2>Projects</h2>
-      <p className="lead">Automatically synced from GitHub.</p>
+      <p className="lead">Automatically synced with all public GitHub repositories.</p>
 
       <div className="card-grid">
         {projects.map((project) => (
