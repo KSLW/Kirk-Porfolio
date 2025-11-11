@@ -9,7 +9,7 @@ export default function ContactForm(){
     e.preventDefault();
     setStatus("sending");
     try{
-      await emailjs.send("service_xxxxxx","template_xxxxxx", form, "public_xxxxxxxxxxxxx");
+      await emailjs.send("service_4tr4e8a","template_vt7xwi5", form, "ufTy2_qorsPVPcXRo");
       setStatus("success");
       setForm({name:"", email:"", message:""});
       console.log(`Message sent at ${new Date().toLocaleString()}`);
