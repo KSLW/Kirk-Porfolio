@@ -4,14 +4,22 @@ const GITHUB_USERNAME = "KSLW";
 
 // ✅ Manual grouping overrides
 const overrides = {
-  obsidian: ["obsidian-core-backend", "dashboard"], // even if names differ
+  obsidian: ["obsidian-core-backend", "dashboard"],
   portfolio: ["kirk-portfolio", "kirk-portfolio-v2"],
 };
+
+// Helper: detect URLs inside descriptions
+function extractLiveURL(description = "") {
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const matches = description.match(urlRegex);
+  return matches ? matches[0] : null;
+}
 
 const Projects = () => {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Fetch ALL repos with pagination
   async function fetchAllRepos() {
     let allRepos = [];
     let page = 1;
@@ -37,7 +45,7 @@ const Projects = () => {
       try {
         const repos = await fetchAllRepos();
 
-        // Group repos by prefix (default)
+        // Group repos by prefix (default auto grouping)
         const grouped = repos.reduce((acc, repo) => {
           const base = repo.name.split("-")[0];
           if (!acc[base]) acc[base] = [];
@@ -47,32 +55,69 @@ const Projects = () => {
 
         // Apply manual overrides
         Object.entries(overrides).forEach(([group, repoNames]) => {
-          const matchedRepos = repos.filter((r) => repoNames.includes(r.name));
-          if (matchedRepos.length > 0) grouped[group] = matchedRepos;
+          const matched = repos.filter((r) => repoNames.includes(r.name));
+          if (matched.length > 0) grouped[group] = matched;
         });
 
-        // Convert to array of cards
-        const groupedProjects = Object.entries(grouped).map(([name, repos]) => ({
-          name: name.charAt(0).toUpperCase() + name.slice(1),
-          description:
-            repos[0].description ||
-            (repos.length > 1
-              ? "A multi-part project built across several repositories."
-              : "A project from my GitHub portfolio."),
-          links: repos.map((r) => ({
-            label:
-              repos.length > 1
-                ? r.name.replace(`${name}-`, "").replaceAll("-", " ")
-                : "GitHub",
-            url: r.html_url,
-          })),
-          updated_at: repos[0].updated_at,
-        }));
+        // Convert groups to display format
+        const groupedProjects = await Promise.all(
+          Object.entries(grouped).map(async ([name, repos]) => {
+            const mainRepo = repos[0];
+            let liveUrl = extractLiveURL(mainRepo.description);
+
+            // ✅ Try fetching topics for better detection (needs separate API call)
+            try {
+              const topicsRes = await fetch(mainRepo.url + "/topics", {
+                headers: { Accept: "application/vnd.github.mercy-preview+json" },
+              });
+              const topicsData = await topicsRes.json();
+              if (
+                topicsData.names &&
+                topicsData.names.some((t) =>
+                  ["live", "demo", "vercel", "deploy"].includes(t.toLowerCase())
+                )
+              ) {
+                liveUrl =
+                  liveUrl ||
+                  `https://${mainRepo.name.replace(/_/g, "-")}.vercel.app`;
+              }
+            } catch {
+              /* ignore */
+            }
+
+            return {
+              name: name.charAt(0).toUpperCase() + name.slice(1),
+              description:
+                mainRepo.description ||
+                (repos.length > 1
+                  ? "A multi-part project built across several repositories."
+                  : "A project from my GitHub portfolio."),
+              links: [
+                ...repos.map((r) => ({
+                  label:
+                    repos.length > 1
+                      ? r.name.replace(`${name}-`, "").replaceAll("-", " ")
+                      : "GitHub",
+                  url: r.html_url,
+                })),
+                ...(liveUrl
+                  ? [
+                      {
+                        label: "Live Demo",
+                        url: liveUrl,
+                        live: true,
+                      },
+                    ]
+                  : []),
+              ],
+              updated_at: mainRepo.updated_at,
+            };
+          })
+        );
 
         groupedProjects.sort(
           (a, b) => new Date(b.updated_at) - new Date(a.updated_at)
         );
-
         setProjects(groupedProjects);
       } catch (err) {
         console.error("GitHub API error:", err);
@@ -89,7 +134,7 @@ const Projects = () => {
   return (
     <section className="section">
       <h2>Projects</h2>
-      <p className="lead">Automatically synced from GitHub (including grouped repos).</p>
+      <p className="lead">Auto-synced with GitHub — includes live demos where available.</p>
 
       <div className="card-grid">
         {projects.map((project) => (
@@ -98,7 +143,7 @@ const Projects = () => {
             <p>{project.description}</p>
 
             <div className="stack">
-              <span className="chip">Auto fetched</span>
+              <span className="chip">Auto Fetched</span>
             </div>
 
             <div style={{ marginTop: "10px" }}>
@@ -108,11 +153,19 @@ const Projects = () => {
                   href={link.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="btn btn-primary"
+                  className={`btn ${
+                    link.live ? "btn-primary" : "btn-secondary"
+                  }`}
                   style={{
                     marginRight: "8px",
                     fontSize: "0.85rem",
                     padding: "0.4rem 0.8rem",
+                    background: link.live
+                      ? "linear-gradient(90deg, var(--mint), var(--purple))"
+                      : "var(--bg-elev)",
+                    color: link.live ? "#111" : "var(--text)",
+                    border: link.live ? "none" : "1px solid var(--border)",
+                    fontWeight: link.live ? 600 : 500,
                   }}
                 >
                   {link.label}
