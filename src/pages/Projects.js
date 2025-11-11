@@ -2,11 +2,16 @@ import React, { useEffect, useState } from "react";
 
 const GITHUB_USERNAME = "KSLW";
 
+// ✅ Manual grouping overrides
+const overrides = {
+  obsidian: ["obsidian-core-backend", "dashboard"], // even if names differ
+  portfolio: ["kirk-portfolio", "kirk-portfolio-v2"],
+};
+
 const Projects = () => {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch ALL repos (pagination aware)
   async function fetchAllRepos() {
     let allRepos = [];
     let page = 1;
@@ -17,7 +22,6 @@ const Projects = () => {
         `https://api.github.com/users/${GITHUB_USERNAME}/repos?per_page=100&page=${page}&sort=updated`
       );
       const data = await res.json();
-
       if (data.length === 0) done = true;
       else {
         allRepos = allRepos.concat(data);
@@ -25,7 +29,7 @@ const Projects = () => {
       }
     }
 
-    return allRepos;
+    return allRepos.filter((r) => !r.fork && r.owner.login === GITHUB_USERNAME);
   }
 
   useEffect(() => {
@@ -33,18 +37,21 @@ const Projects = () => {
       try {
         const repos = await fetchAllRepos();
 
-        // Filter only your owned, non-fork repos
-        const userRepos = repos.filter((repo) => !repo.fork && repo.owner.login === GITHUB_USERNAME);
-
-        // Group by base project name
-        const grouped = userRepos.reduce((acc, repo) => {
-          const base = repo.name.split("-")[0]; // e.g. obsidian-core → obsidian
+        // Group repos by prefix (default)
+        const grouped = repos.reduce((acc, repo) => {
+          const base = repo.name.split("-")[0];
           if (!acc[base]) acc[base] = [];
           acc[base].push(repo);
           return acc;
         }, {});
 
-        // Convert grouped repos to clean project objects
+        // Apply manual overrides
+        Object.entries(overrides).forEach(([group, repoNames]) => {
+          const matchedRepos = repos.filter((r) => repoNames.includes(r.name));
+          if (matchedRepos.length > 0) grouped[group] = matchedRepos;
+        });
+
+        // Convert to array of cards
         const groupedProjects = Object.entries(grouped).map(([name, repos]) => ({
           name: name.charAt(0).toUpperCase() + name.slice(1),
           description:
@@ -59,18 +66,16 @@ const Projects = () => {
                 : "GitHub",
             url: r.html_url,
           })),
-          tech: [],
           updated_at: repos[0].updated_at,
         }));
 
-        // Sort newest first
         groupedProjects.sort(
           (a, b) => new Date(b.updated_at) - new Date(a.updated_at)
         );
 
         setProjects(groupedProjects);
       } catch (err) {
-        console.error("Error fetching GitHub repos:", err);
+        console.error("GitHub API error:", err);
       } finally {
         setLoading(false);
       }
@@ -84,7 +89,7 @@ const Projects = () => {
   return (
     <section className="section">
       <h2>Projects</h2>
-      <p className="lead">Automatically synced with all public GitHub repositories.</p>
+      <p className="lead">Automatically synced from GitHub (including grouped repos).</p>
 
       <div className="card-grid">
         {projects.map((project) => (
@@ -93,11 +98,7 @@ const Projects = () => {
             <p>{project.description}</p>
 
             <div className="stack">
-              {project.tech.length > 0 ? (
-                project.tech.map((t) => <span key={t} className="chip">{t}</span>)
-              ) : (
-                <span className="chip">Auto Fetched</span>
-              )}
+              <span className="chip">Auto fetched</span>
             </div>
 
             <div style={{ marginTop: "10px" }}>
