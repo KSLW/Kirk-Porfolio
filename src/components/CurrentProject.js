@@ -1,60 +1,90 @@
-import { useEffect, useState } from "react";
-export default function CurrentProject(){
-  const [repo, setRepo] = useState(null);
-  const GITHUB_USERNAME = "KSLW";
-  const CACHE_KEY = "latest_repo";
-  const CACHE_DURATION = 1000 * 60 * 60 * 12; // 12h
+import React, { useState, useEffect } from "react";
 
-  useEffect(()=>{
-    async function fetchLatest(){
-      try{
-        const cached = localStorage.getItem(CACHE_KEY);
-        if(cached){
-          const parsed = JSON.parse(cached);
-          if(Date.now() - parsed.timestamp < CACHE_DURATION){
-            setRepo(parsed.data);
-            return;
-          }
-        }
-        const resp = await fetch(`https://api.github.com/users/${GITHUB_USERNAME}/events/public`);
-        const data = await resp.json();
-        const pushEvent = Array.isArray(data) ? data.find(ev => ev.type === "PushEvent") : null;
-        const newRepo = pushEvent ? {
-          name: pushEvent.repo.name.split("/")[1],
-          url: `https://github.com/${pushEvent.repo.name}`,
-          description: "Latest repository with an active code push.",
-          updated_at: pushEvent.created_at
-        } : {
-          name: "Obsidian",
-          url: "https://github.com/KSLW/obsidian",
-          description: "A full-stack automation tool for streamers and communities.",
-          updated_at: new Date().toISOString()
-        };
-        localStorage.setItem(CACHE_KEY, JSON.stringify({data:newRepo, timestamp:Date.now()}));
-        setRepo(newRepo);
-      }catch(e){
-        console.error("GitHub fetch failed", e);
-        setRepo({
-          name: "Obsidian",
-          url: "https://github.com/KSLW/obsidian",
-          description: "A full-stack automation tool for streamers and communities.",
-          updated_at: new Date().toISOString()
-        });
+const GITHUB_USERNAME = "KSLW";
+const CACHE_DURATION = 1000 * 60 * 30; // 30 minutes cache
+
+const CurrentProject = () => {
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const cached = localStorage.getItem("latest_projects");
+    const cacheTime = localStorage.getItem("latest_projects_time");
+
+    if (cached && cacheTime && Date.now() - cacheTime < CACHE_DURATION) {
+      setProjects(JSON.parse(cached));
+      setLoading(false);
+      return;
+    }
+
+    async function fetchProjects() {
+      try {
+        const res = await fetch(
+          `https://api.github.com/users/${GITHUB_USERNAME}/repos?sort=updated&per_page=10`
+        );
+        const data = await res.json();
+
+        // Detect grouped projects like obsidian-core-backend + dashboard
+        const grouped = data.reduce((acc, repo) => {
+          const baseName = repo.name.split("-")[0];
+          if (!acc[baseName]) acc[baseName] = [];
+          acc[baseName].push(repo);
+          return acc;
+        }, {});
+
+        const topProjects = Object.entries(grouped)
+          .map(([key, repos]) => ({
+            name: key,
+            repos,
+          }))
+          .slice(0, 3); // limit display
+
+        setProjects(topProjects);
+        localStorage.setItem("latest_projects", JSON.stringify(topProjects));
+        localStorage.setItem("latest_projects_time", Date.now());
+      } catch (err) {
+        console.error("GitHub fetch failed:", err);
+      } finally {
+        setLoading(false);
       }
     }
-    fetchLatest();
-  },[]);
 
-  if(!repo) return null;
-  const lastUpdated = new Date(repo.updated_at);
-  const daysAgo = Math.floor((Date.now() - lastUpdated.getTime()) / (1000*60*60*24));
+    fetchProjects();
+  }, []);
+
+  if (loading) return <div className="current-project">Loading projects...</div>;
+  if (!projects.length)
+    return (
+      <div className="current-project">No recent projects found 😅</div>
+    );
+
   return (
     <div className="current-project">
-      <p>🛠️ <strong>Currently working on:</strong>{" "}
-        <a href={repo.url} target="_blank" rel="noreferrer" className="highlight">{repo.name}</a>{" "}
-        — {repo.description}
-        <span className="updated-badge"> • Updated {daysAgo===0?"today":`${daysAgo} day${daysAgo>1?"s":""} ago`}</span>
+      <p>
+        <strong>Currently Working On:</strong>
       </p>
+      {projects.map((proj) => (
+        <div key={proj.name} style={{ marginTop: "4px" }}>
+          <span className="highlight">{proj.name}</span>{" "}
+          {proj.repos.map((r, i) => (
+            <a
+              key={r.id}
+              href={r.html_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                color: "var(--mint)",
+                marginLeft: "8px",
+                fontWeight: 500,
+              }}
+            >
+              [{r.name.replace(`${proj.name}-`, "")}]
+            </a>
+          ))}
+        </div>
+      ))}
     </div>
   );
-}
+};
+
+export default CurrentProject;
