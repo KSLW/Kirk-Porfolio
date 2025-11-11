@@ -30,26 +30,38 @@ const Projects = () => {
   const [loading, setLoading] = useState(true);
 
   async function fetchAllRepos() {
-    let allRepos = [];
-    let page = 1;
-    let done = false;
+  let allRepos = [];
+  let page = 1;
+  let done = false;
 
-    while (!done) {
-      const res = await fetch(
-        `https://api.github.com/users/${GITHUB_USERNAME}/repos?per_page=100&page=${page}&sort=updated`
-      );
-      const data = await res.json();
+  const headers = {
+    Authorization: process.env.REACT_APP_GITHUB_TOKEN
+      ? `Bearer ${process.env.REACT_APP_GITHUB_TOKEN}`
+      : undefined,
+    Accept: "application/vnd.github+json",
+  };
 
-      if (!Array.isArray(data) || data.length === 0) {
-        done = true;
-      } else {
-        allRepos = allRepos.concat(data);
-        page++;
-      }
+  while (!done) {
+    const res = await fetch(
+      `https://api.github.com/users/${GITHUB_USERNAME}/repos?per_page=100&page=${page}&sort=updated`,
+      { headers }
+    );
+    if (!res.ok) {
+      throw new Error(`GitHub API error: ${res.status}`);
     }
+    const data = await res.json();
 
-    return allRepos.filter((r) => !r.fork && r.owner.login === GITHUB_USERNAME);
+    if (!Array.isArray(data) || data.length === 0) {
+      done = true;
+    } else {
+      allRepos = allRepos.concat(data);
+      page++;
+    }
   }
+
+  return allRepos.filter((r) => !r.fork && r.owner.login === GITHUB_USERNAME);
+}
+
 
   useEffect(() => {
     async function fetchRepos() {
