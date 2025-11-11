@@ -90,6 +90,32 @@ const Projects = () => {
             const mainRepo = repos[0];
             let liveUrl = extractLiveURL(mainRepo.description);
 
+// 🧠 Fallback: check README for live demo URL if not found in description
+if (!liveUrl) {
+  try {
+    const readmeRes = await fetch(
+      `https://api.github.com/repos/${GITHUB_USERNAME}/${mainRepo.name}/readme`,
+      {
+        headers: {
+          Accept: "application/vnd.github.v3.raw",
+          Authorization: process.env.REACT_APP_GITHUB_TOKEN
+            ? `Bearer ${process.env.REACT_APP_GITHUB_TOKEN}`
+            : undefined,
+        },
+      }
+    );
+
+    if (readmeRes.ok) {
+      const readmeText = await readmeRes.text();
+      const foundInReadme = extractLiveURL(readmeText);
+      if (foundInReadme) liveUrl = foundInReadme;
+    }
+  } catch (err) {
+    console.warn(`Failed to fetch README for ${mainRepo.name}:`, err);
+  }
+}
+
+
             // Topic check
             try {
               const topicsRes = await fetch(mainRepo.url + "/topics", {
