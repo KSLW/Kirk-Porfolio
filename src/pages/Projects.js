@@ -18,12 +18,41 @@ const overrides = {
 };
 
 // Helper: detect URLs safely
-function extractLiveURL(description) {
-  if (!description || typeof description !== "string") return null;
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
-  const matches = description.match(urlRegex);
-  return matches ? matches[0] : null;
+function extractLiveURL(text) {
+  if (!text || typeof text !== "string") return null;
+
+  const urlRegex = /(https?:\/\/[^\s)]+)/g;
+  const urls = [...text.matchAll(urlRegex)].map(m => m[0]);
+
+  if (urls.length === 0) return null;
+
+  // 🧱 Ignore known badge/CDN/asset URLs
+  const blacklist = [
+    "shields.io",
+    "komarev.com",
+    "githubusercontent",
+    "img.shields",
+    "badge",
+    "github.com/",
+  ];
+
+  const cleanUrls = urls.filter(
+    url => !blacklist.some(bad => url.toLowerCase().includes(bad))
+  );
+
+  // 🎯 Prefer URLs near keywords like "live", "demo", "frontend", "preview"
+  const liveKeywordMatch = text.match(
+    /(live|demo|frontend|preview)[^\n]*https?:\/\/[^\s)]+/i
+  );
+  if (liveKeywordMatch) {
+    const liveMatch = liveKeywordMatch[0].match(urlRegex);
+    if (liveMatch && liveMatch[0]) return liveMatch[0];
+  }
+
+  // 🧩 Otherwise return the first non-blacklisted URL
+  return cleanUrls[0] || null;
 }
+
 
 const Projects = () => {
   const [projects, setProjects] = useState([]);
