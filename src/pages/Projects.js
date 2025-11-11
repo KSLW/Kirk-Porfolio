@@ -2,22 +2,22 @@ import React, { useEffect, useState } from "react";
 
 const GITHUB_USERNAME = "KSLW";
 
-// ✅ Manual grouping + live demo overrides
+// ✅ Grouping + guaranteed live demo overrides
 const overrides = {
   obsidian: {
     repos: ["obsidian-core-backend", "dashboard"],
     live: [
-      { label: "Dashboard Demo", url: "https://dashboard-3let.onrender.com" },
-      { label: "API Demo", url: "https://obsidian-core-backend.onrender.com" },
+      { label: "🖥️ Dashboard Demo", url: "https://dashboard-3let.onrender.com" },
+      { label: "⚙️ API Demo", url: "https://obsidian-core-backend.onrender.com" },
     ],
   },
   portfolio: {
     repos: ["kirk-portfolio", "kirk-portfolio-v2"],
-    live: [{ label: "Live Demo", url: "https://kirk-portfolio.vercel.app" }],
+    live: [{ label: "🌐 Live Demo", url: "https://kirk-portfolio.vercel.app" }],
   },
 };
 
-// ✅ Helper: safely detect URLs in descriptions
+// Helper: detect URLs safely
 function extractLiveURL(description) {
   if (!description || typeof description !== "string") return null;
   const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -29,7 +29,6 @@ const Projects = () => {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch all repos (with pagination)
   async function fetchAllRepos() {
     let allRepos = [];
     let page = 1;
@@ -57,7 +56,7 @@ const Projects = () => {
       try {
         const repos = await fetchAllRepos();
 
-        // Auto-group repos by prefix
+        // Auto-group by prefix
         const grouped = repos.reduce((acc, repo) => {
           const base = repo.name.split("-")[0];
           if (!acc[base]) acc[base] = [];
@@ -65,7 +64,7 @@ const Projects = () => {
           return acc;
         }, {});
 
-        // Apply manual overrides (attach live links)
+        // Apply overrides (attach live links)
         Object.entries(overrides).forEach(([group, config]) => {
           const matched = repos.filter((r) => config.repos.includes(r.name));
           if (matched.length > 0) {
@@ -79,13 +78,12 @@ const Projects = () => {
             const mainRepo = repos[0];
             let liveUrl = extractLiveURL(mainRepo.description);
 
-            // Check for GitHub topics that might hint at live demos
+            // Topic check
             try {
               const topicsRes = await fetch(mainRepo.url + "/topics", {
                 headers: { Accept: "application/vnd.github.mercy-preview+json" },
               });
               const topicsData = await topicsRes.json();
-
               if (
                 topicsData &&
                 topicsData.names &&
@@ -97,11 +95,10 @@ const Projects = () => {
                   liveUrl ||
                   `https://${mainRepo.name.replace(/_/g, "-")}.vercel.app`;
               }
-            } catch (err) {
-              console.warn("Topic fetch failed:", err);
+            } catch {
+              /* ignore */
             }
 
-            // Prepare repo details
             const repoDetails = repos.map((r) => ({
               name: r.name,
               description:
@@ -110,7 +107,6 @@ const Projects = () => {
               html_url: r.html_url,
             }));
 
-            // Merge live links: override live URLs or fallback from GitHub
             const liveLinks = Array.isArray(grouped[name]?.live)
               ? grouped[name].live
               : grouped[name]?.live
@@ -131,11 +127,13 @@ const Projects = () => {
                 ...repos.map((r) => ({
                   label:
                     repos.length > 1
-                      ? r.name.replace(`${name}-`, "").replaceAll("-", " ")
+                      ? `💻 ${r.name
+                          .replace(`${name}-`, "")
+                          .replaceAll("-", " ")}`
                       : "GitHub",
                   url: r.html_url,
                 })),
-                ...liveLinks,
+                ...liveLinks.map((l) => ({ ...l, live: true })),
               ],
               updated_at: mainRepo.updated_at,
             };
@@ -162,7 +160,7 @@ const Projects = () => {
     <section className="section">
       <h2>Projects</h2>
       <p className="lead">
-        Auto-synced from GitHub — includes repo descriptions and live demos.
+        Auto-synced from GitHub — includes live demos and repo details.
       </p>
 
       <div className="card-grid">
@@ -171,7 +169,7 @@ const Projects = () => {
             <h3>{project.name}</h3>
             <p>{project.description}</p>
 
-            {/* Show repo descriptions for grouped projects */}
+            {/* Repo details list */}
             {project.repos.length > 1 && (
               <ul style={{ margin: "0.75rem 0 1rem", paddingLeft: "1rem" }}>
                 {project.repos.map((r) => (
@@ -185,8 +183,15 @@ const Projects = () => {
               </ul>
             )}
 
-            {/* Buttons */}
-            <div style={{ marginTop: "10px" }}>
+            {/* Buttons section */}
+            <div
+              style={{
+                marginTop: "10px",
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "8px",
+              }}
+            >
               {project.links.map((link) => (
                 <a
                   key={link.url}
@@ -195,15 +200,36 @@ const Projects = () => {
                   rel="noopener noreferrer"
                   className={`btn ${link.live ? "btn-primary" : "btn-secondary"}`}
                   style={{
-                    marginRight: "8px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minWidth: "130px",
+                    gap: "0.3rem",
                     fontSize: "0.85rem",
-                    padding: "0.4rem 0.8rem",
+                    padding: "0.45rem 0.9rem",
                     background: link.live
                       ? "linear-gradient(90deg, var(--mint), var(--purple))"
                       : "var(--bg-elev)",
                     color: link.live ? "#111" : "var(--text)",
                     border: link.live ? "none" : "1px solid var(--border)",
                     fontWeight: link.live ? 600 : 500,
+                    borderRadius: "8px",
+                    boxShadow: link.live
+                      ? "0 0 10px rgba(102,240,198,0.3)"
+                      : "none",
+                    transition:
+                      "transform 0.2s ease, box-shadow 0.25s ease, opacity 0.25s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = "translateY(-2px)";
+                    e.currentTarget.style.boxShadow =
+                      "0 4px 12px rgba(167,139,250,0.4)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.boxShadow = link.live
+                      ? "0 0 10px rgba(102,240,198,0.3)"
+                      : "none";
                   }}
                 >
                   {link.label}
