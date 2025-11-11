@@ -93,8 +93,14 @@ const Projects = () => {
             // Topic check
             try {
               const topicsRes = await fetch(mainRepo.url + "/topics", {
-                headers: { Accept: "application/vnd.github.mercy-preview+json" },
-              });
+  headers: {
+    Accept: "application/vnd.github.mercy-preview+json",
+    Authorization: process.env.REACT_APP_GITHUB_TOKEN
+      ? `Bearer ${process.env.REACT_APP_GITHUB_TOKEN}`
+      : undefined,
+  },
+});
+
               const topicsData = await topicsRes.json();
               if (
                 topicsData &&
