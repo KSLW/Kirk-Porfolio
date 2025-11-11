@@ -4,9 +4,22 @@ const GITHUB_USERNAME = "KSLW";
 
 // ✅ Manual grouping overrides
 const overrides = {
-  obsidian: ["obsidian-core-backend", "dashboard"],
-  portfolio: ["kirk-portfolio", "kirk-portfolio-v2"],
+  obsidian: {
+    repos: ["obsidian-core-backend", "dashboard"],
+    live: [
+      { label: "Dashboard Demo", url: "https://dashboard-3let.onrender.com" },
+      { label: "API Demo", url: "https://obsidian-core-backend.onrender.com" },
+    ]
+  },
+  portfolio: {
+    repos: ["kirk-portfolio", "kirk-portfolio-v2"],
+    live: "https://kirk-portfolio.vercel.app", // your portfolio demo
+  },
 };
+
+// Pull from either GitHub or override map
+const finalLiveUrl = grouped[name]?.live || liveUrl;
+
 
 // ✅ Helper: safely detect URLs in repo descriptions
 function extractLiveURL(description) {
@@ -57,10 +70,13 @@ const Projects = () => {
         }, {});
 
         // Apply manual overrides
-        Object.entries(overrides).forEach(([group, repoNames]) => {
-          const matched = repos.filter((r) => repoNames.includes(r.name));
-          if (matched.length > 0) grouped[group] = matched;
-        });
+        Object.entries(overrides).forEach(([group, config]) => {
+        const matched = repos.filter((r) => config.repos.includes(r.name));
+        if (matched.length > 0) {
+          grouped[group] = matched;
+          grouped[group].live = config.live; // attach live link
+        }
+      });
 
         const groupedProjects = await Promise.all(
           Object.entries(grouped).map(async ([name, repos]) => {
@@ -105,17 +121,19 @@ const Projects = () => {
                   ? "A multi-part project built across several repositories."
                   : "A project from my GitHub portfolio."),
               repos: repoDetails,
-              links: [
-                ...(liveUrl
-                  ? [
-                      {
-                        label: "Live Demo",
-                        url: liveUrl,
-                        live: true,
-                      },
-                    ]
-                  : []),
-              ],
+
+links: [
+  ...(finalLiveUrl
+    ? [
+        {
+          label: "Live Demo",
+          url: finalLiveUrl,
+          live: true,
+        },
+      ]
+    : []),
+],
+,
               updated_at: mainRepo.updated_at,
             };
           })
