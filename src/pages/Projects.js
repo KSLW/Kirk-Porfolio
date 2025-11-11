@@ -8,8 +8,9 @@ const overrides = {
   portfolio: ["kirk-portfolio", "kirk-portfolio-v2"],
 };
 
-// Helper: detect URLs inside descriptions
-function extractLiveURL(description = "") {
+// ✅ Helper: safely detect URLs in repo descriptions
+function extractLiveURL(description) {
+  if (!description || typeof description !== "string") return null;
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   const matches = description.match(urlRegex);
   return matches ? matches[0] : null;
@@ -19,7 +20,7 @@ const Projects = () => {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch ALL repos with pagination
+  // Fetch ALL repos from GitHub
   async function fetchAllRepos() {
     let allRepos = [];
     let page = 1;
@@ -30,13 +31,16 @@ const Projects = () => {
         `https://api.github.com/users/${GITHUB_USERNAME}/repos?per_page=100&page=${page}&sort=updated`
       );
       const data = await res.json();
-      if (data.length === 0) done = true;
-      else {
+
+      if (!Array.isArray(data) || data.length === 0) {
+        done = true;
+      } else {
         allRepos = allRepos.concat(data);
         page++;
       }
     }
 
+    // Only keep your repos, not forks
     return allRepos.filter((r) => !r.fork && r.owner.login === GITHUB_USERNAME);
   }
 
@@ -45,7 +49,7 @@ const Projects = () => {
       try {
         const repos = await fetchAllRepos();
 
-        // Group repos by prefix (default auto grouping)
+        // Auto-group by prefix (before first dash)
         const grouped = repos.reduce((acc, repo) => {
           const base = repo.name.split("-")[0];
           if (!acc[base]) acc[base] = [];
@@ -59,19 +63,21 @@ const Projects = () => {
           if (matched.length > 0) grouped[group] = matched;
         });
 
-        // Convert groups to display format
+        // Convert groups to displayable projects
         const groupedProjects = await Promise.all(
           Object.entries(grouped).map(async ([name, repos]) => {
             const mainRepo = repos[0];
             let liveUrl = extractLiveURL(mainRepo.description);
 
-            // ✅ Try fetching topics for better detection (needs separate API call)
+            // Try checking GitHub topics for “live”, “demo”, etc.
             try {
               const topicsRes = await fetch(mainRepo.url + "/topics", {
                 headers: { Accept: "application/vnd.github.mercy-preview+json" },
               });
               const topicsData = await topicsRes.json();
+
               if (
+                topicsData &&
                 topicsData.names &&
                 topicsData.names.some((t) =>
                   ["live", "demo", "vercel", "deploy"].includes(t.toLowerCase())
@@ -81,8 +87,8 @@ const Projects = () => {
                   liveUrl ||
                   `https://${mainRepo.name.replace(/_/g, "-")}.vercel.app`;
               }
-            } catch {
-              /* ignore */
+            } catch (topicErr) {
+              console.warn("Topic fetch failed:", topicErr);
             }
 
             return {
@@ -115,9 +121,11 @@ const Projects = () => {
           })
         );
 
+        // Sort newest first
         groupedProjects.sort(
           (a, b) => new Date(b.updated_at) - new Date(a.updated_at)
         );
+
         setProjects(groupedProjects);
       } catch (err) {
         console.error("GitHub API error:", err);
@@ -153,9 +161,7 @@ const Projects = () => {
                   href={link.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`btn ${
-                    link.live ? "btn-primary" : "btn-secondary"
-                  }`}
+                  className={`btn ${link.live ? "btn-primary" : "btn-secondary"}`}
                   style={{
                     marginRight: "8px",
                     fontSize: "0.85rem",
