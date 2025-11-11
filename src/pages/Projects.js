@@ -20,7 +20,7 @@ const Projects = () => {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch ALL repos from GitHub
+  // Fetch ALL repos from GitHub (with pagination)
   async function fetchAllRepos() {
     let allRepos = [];
     let page = 1;
@@ -40,7 +40,6 @@ const Projects = () => {
       }
     }
 
-    // Only keep your repos, not forks
     return allRepos.filter((r) => !r.fork && r.owner.login === GITHUB_USERNAME);
   }
 
@@ -49,7 +48,7 @@ const Projects = () => {
       try {
         const repos = await fetchAllRepos();
 
-        // Auto-group by prefix (before first dash)
+        // Auto-group repos by prefix (before first dash)
         const grouped = repos.reduce((acc, repo) => {
           const base = repo.name.split("-")[0];
           if (!acc[base]) acc[base] = [];
@@ -63,19 +62,17 @@ const Projects = () => {
           if (matched.length > 0) grouped[group] = matched;
         });
 
-        // Convert groups to displayable projects
         const groupedProjects = await Promise.all(
           Object.entries(grouped).map(async ([name, repos]) => {
             const mainRepo = repos[0];
             let liveUrl = extractLiveURL(mainRepo.description);
 
-            // Try checking GitHub topics for “live”, “demo”, etc.
+            // Try to detect live demos from topics
             try {
               const topicsRes = await fetch(mainRepo.url + "/topics", {
                 headers: { Accept: "application/vnd.github.mercy-preview+json" },
               });
               const topicsData = await topicsRes.json();
-
               if (
                 topicsData &&
                 topicsData.names &&
@@ -87,9 +84,18 @@ const Projects = () => {
                   liveUrl ||
                   `https://${mainRepo.name.replace(/_/g, "-")}.vercel.app`;
               }
-            } catch (topicErr) {
-              console.warn("Topic fetch failed:", topicErr);
+            } catch (err) {
+              console.warn("Topic fetch failed:", err);
             }
+
+            // Build list of repo details for the UI
+            const repoDetails = repos.map((r) => ({
+              name: r.name,
+              description:
+                r.description ||
+                "No description provided yet — this repo may still be in progress.",
+              html_url: r.html_url,
+            }));
 
             return {
               name: name.charAt(0).toUpperCase() + name.slice(1),
@@ -98,14 +104,8 @@ const Projects = () => {
                 (repos.length > 1
                   ? "A multi-part project built across several repositories."
                   : "A project from my GitHub portfolio."),
+              repos: repoDetails,
               links: [
-                ...repos.map((r) => ({
-                  label:
-                    repos.length > 1
-                      ? r.name.replace(`${name}-`, "").replaceAll("-", " ")
-                      : "GitHub",
-                  url: r.html_url,
-                })),
                 ...(liveUrl
                   ? [
                       {
@@ -142,7 +142,9 @@ const Projects = () => {
   return (
     <section className="section">
       <h2>Projects</h2>
-      <p className="lead">Auto-synced with GitHub — includes live demos where available.</p>
+      <p className="lead">
+        Auto-synced from GitHub — includes repo descriptions and live demos.
+      </p>
 
       <div className="card-grid">
         {projects.map((project) => (
@@ -150,28 +152,51 @@ const Projects = () => {
             <h3>{project.name}</h3>
             <p>{project.description}</p>
 
-            <div className="stack">
-              <span className="chip">Auto Fetched</span>
-            </div>
+            {/* Individual repo descriptions (for grouped projects) */}
+            {project.repos.length > 1 && (
+              <ul style={{ margin: "0.75rem 0 1rem", paddingLeft: "1rem" }}>
+                {project.repos.map((r) => (
+                  <li key={r.name} style={{ marginBottom: "0.4rem" }}>
+                    <strong>{r.name.replace(`${project.name.toLowerCase()}-`, "")}:</strong>{" "}
+                    {r.description}
+                  </li>
+                ))}
+              </ul>
+            )}
 
+            {/* Buttons */}
             <div style={{ marginTop: "10px" }}>
+              {project.repos.map((r) => (
+                <a
+                  key={r.html_url}
+                  href={r.html_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn"
+                  style={{
+                    marginRight: "8px",
+                    fontSize: "0.85rem",
+                    padding: "0.4rem 0.8rem",
+                    border: "1px solid var(--border)",
+                    color: "var(--text)",
+                    background: "var(--bg-elev)",
+                  }}
+                >
+                  {r.name.replace(`${project.name.toLowerCase()}-`, "")}
+                </a>
+              ))}
+
               {project.links.map((link) => (
                 <a
                   key={link.url}
                   href={link.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`btn ${link.live ? "btn-primary" : "btn-secondary"}`}
+                  className="btn btn-primary"
                   style={{
                     marginRight: "8px",
                     fontSize: "0.85rem",
                     padding: "0.4rem 0.8rem",
-                    background: link.live
-                      ? "linear-gradient(90deg, var(--mint), var(--purple))"
-                      : "var(--bg-elev)",
-                    color: link.live ? "#111" : "var(--text)",
-                    border: link.live ? "none" : "1px solid var(--border)",
-                    fontWeight: link.live ? 600 : 500,
                   }}
                 >
                   {link.label}
