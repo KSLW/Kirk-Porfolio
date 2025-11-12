@@ -1,28 +1,51 @@
-export default function About(){
+import { useEffect, useRef, useState } from "react";
+import Me from "../assets/Me.jpg";
+
+export default function About() {
+  const sectionRef = useRef(null);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsVisible(entry.isIntersecting),
+      { threshold: 0.2 }
+    );
+    if (sectionRef.current) observer.observe(sectionRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <section className="section">
-      <div className="container">
-        <h2>About Me</h2>
-        <p>
-          I’m <strong>Kirk Wilkinson</strong> — a self-taught full-stack developer who builds clean, reliable,
-          and human-centered software using the <strong>MERN</strong> and <strong>PERN</strong> stacks.
-        </p>
-        <p>
-          My background isn’t the usual one — I started my career as a chef, where I learned precision, timing,
-          and how to stay calm under pressure. Eventually, I realized the part I loved most was the <em>creative problem solving</em> —
-          and I found that same spark in coding.
-        </p>
-        <p>
-          Today, I channel that energy into crafting intuitive interfaces and modular backends. Whether it’s automating workflows,
-          integrating APIs, or improving user experience, I focus on making tech feel effortless.
-        </p>
-        <p>
-          Outside of code, I run <strong>LogicallySleepy</strong> — a growing Twitch and Discord community where I experiment
-          with interactive bots, overlays, and automation tools like <strong>Obsidian</strong>.
-        </p>
-        <p className="tagline">
-          <em>Chef by day turned developer by choice — always chasing cleaner code and better user experiences.</em>
-        </p>
+    <section
+      ref={sectionRef}
+      id="about"
+      tabIndex="0"
+      aria-labelledby="about-heading"
+      className={`section about-section ${isVisible ? "visible" : ""}`}
+    >
+      <div className="about-container">
+        <div className="about-image-wrapper">
+          <img
+            src={Me}
+            className="about-photo"
+            alt="Portrait of Kirk Wilkinson, Full-Stack Developer"
+            loading="lazy"
+          />
+        </div>
+
+        <div className="about-content">
+          <h2 id="about-heading">About Me</h2>
+          <p>
+            I’m a <strong>full-stack developer</strong> passionate about creating
+            modern, dynamic, and engaging digital experiences that blend design
+            with performance.
+          </p>
+          <p>
+            I focus on crafting seamless interactions between front-end visuals
+            and backend logic — building projects that are both elegant and
+            powerful. Currently developing <strong>Obsidian</strong>, a
+            next-generation integration of UI motion and automation.
+          </p>
+        </div>
       </div>
     </section>
   );
